@@ -19,14 +19,13 @@ app.get('/paypal-cancel', (req, res) => res.send('PayPal payment cancelled'));
 
 
 // === PostgreSQL (Railway) ===
-const isSSL = String(process.env.DB_SSL || '').toLowerCase() === 'true';
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  ssl: isSSL ? { rejectUnauthorized: false } : false,
+  host: process.env.DB_HOST || "postgres.railway.internal",
+  port: process.env.DB_PORT || 34727,
+  user: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASS || "KgREPqRkVCCSNIqtVATphEKGgHedkiNx",
+  database: process.env.DB_NAME || "railway",
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
 
 // MySQL->PG compatibility wrapper
