@@ -1,5 +1,6 @@
 const express = require('express');
-const mysql = require('mysql2');
+require('dotenv').config();
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -12,18 +13,57 @@ app.use(bodyParser.json());
 // ✅ Serve local images (food pictures)
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'mdb'
+// Minimal PayPal redirects (sandbox)
+app.get('/paypal-return', (req, res) => res.send('PayPal payment success (sandbox return)'));
+app.get('/paypal-cancel', (req, res) => res.send('PayPal payment cancelled'));
+
+
+// === PostgreSQL (Railway) ===
+const isSSL = String(process.env.DB_SSL || '').toLowerCase() === 'true';
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  ssl: isSSL ? { rejectUnauthorized: false } : false,
 });
 
+// MySQL->PG compatibility wrapper
+function qmarkToDollar(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => {
+    i += 1;
+    return `$${i}`;
+  });
+}
+
+const db = {
+  connect(cb) {
+    pool.connect()
+      .then(client => { client.release(); cb && cb(); })
+      .catch(err => { cb && cb(err); });
+  },
+  query(sql, params, cb) {
+    if (typeof params === 'function') { cb = params; params = []; }
+    const rewritten = qmarkToDollar(sql);
+    pool.query(rewritten, Array.isArray(params) ? params : [])
+      .then(result => {
+        // Align with mysql2 callback shape
+        const resShape = {
+          rows: result.rows,
+          affectedRows: result.rowCount ?? 0,
+        };
+        cb && cb(null, resShape.rows || resShape);
+      })
+      .catch(err => cb && cb(err));
+  }
+};
 db.connect(err => {
   if (err) {
     console.error('❌ DB connection failed:', err);
   } else {
-    console.log('✅ MySQL Connected');
+    console.log('✅ PostgreSQL pool ready');
   }
 });
 
@@ -499,6 +539,6 @@ app.delete('/admin/transactions/clear', (req, res) => {
 // =========================
 // 🚀 START SERVER
 // =========================
-app.listen(3000, '0.0.0.0', () =>
-  console.log('✅ Server running on http://localhost:3000')
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log('✅ Server running on http://localhost:3000')
 );
