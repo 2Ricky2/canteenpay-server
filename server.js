@@ -284,19 +284,18 @@ app.get('/orders/all/:user_id', (req, res) => {
   });
 });
 
-// keep /orders/all/:user_id FIRST above this
 
+// ACTIVE orders (Pending/Preparing/Paid)
 app.get('/orders/:user_id', (req, res) => {
   const userId = parseInt(req.params.user_id, 10);
   if (!Number.isInteger(userId)) {
     return res.status(400).json({ success: false, message: 'Invalid user_id' });
   }
-
-  const ACTIVE = ['Pending', 'Preparing', 'Paid', 'Active']; // treat all as "Active"
+  const ACTIVE = ['Pending', 'Preparing', 'Paid'];
   const sql = `
     SELECT 
       o.id,
-      CASE WHEN o.status = ANY($2::text[]) THEN 'Active' ELSE o.status END AS status,
+      o.status,
       o.quantity,
       o.total_price,
       m.name  AS food_name,
@@ -308,16 +307,11 @@ app.get('/orders/:user_id', (req, res) => {
       AND o.status = ANY($2::text[])
     ORDER BY o.created_at DESC, o.id DESC
   `;
-
   db.query(sql, [userId, ACTIVE], (err, rows) => {
-    if (err) {
-      console.error('orders (active) DB error:', err);
-      return res.json({ success: false, message: 'DB error' });
-    }
+    if (err) return res.json({ success: false, message: 'DB error' });
     res.json({ success: true, orders: rows });
   });
 });
-
 
 
 
