@@ -20,7 +20,7 @@ app.get('/paypal-cancel', (req, res) => res.send('PayPal payment cancelled'));
 
 // === PostgreSQL (Railway) ===
 const pool = new Pool({
-  host: process.env.DB_HOST || "postgres.railway.internal",
+  host: process.env.DB_HOST || "yamabiko.proxy.rlwy.net",
   port: process.env.DB_PORT || 34727,
   user: process.env.DB_USER || "postgres",
   password: process.env.DB_PASS || "KgREPqRkVCCSNIqtVATphEKGgHedkiNx",
