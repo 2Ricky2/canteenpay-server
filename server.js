@@ -358,26 +358,70 @@ app.delete('/orders/deletePaid/:user_id', (req, res) => {
 
 
 
-// ✅ Update an order’s status (used by admin)
-app.put('/orders/:id', (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
+// 1) ALL orders for a user (put this first)
+app.get('/orders/all/:user_id', (req, res) => {
+  const userId = parseInt(req.params.user_id, 10);
+  if (!Number.isInteger(userId)) {
+    return res.status(400).json({ success: false, message: 'Invalid user_id' });
+  }
 
-  if (!status) return res.json({ success: false, message: 'Missing status' });
+  const sql = `
+    SELECT 
+      o.id,
+      o.status,
+      o.quantity,
+      o.total_price,
+      m.name  AS food_name,
+      m.price,
+      m.image_url
+    FROM orders o
+    LEFT JOIN menu_items m ON o.menu_id = m.id
+    WHERE o.user_id = $1
+    ORDER BY o.created_at DESC, o.id DESC
+  `;
 
-  const validStatuses = ['Active', 'Paid', 'Completed', 'Cancelled'];
-  if (!validStatuses.includes(status))
-    return res.json({ success: false, message: 'Invalid status value' });
-
-  const sql = 'UPDATE orders SET status = ? WHERE id = ?';
-  db.query(sql, [status, id], err => {
+  db.query(sql, [userId], (err, rows) => {
     if (err) {
-      console.error(err);
-      return res.json({ success: false, message: 'Database update error' });
+      console.error('orders/all DB error:', err.message || err);
+      return res.json({ success: false, message: 'DB error' });
     }
-    res.json({ success: true, message: `Order marked as ${status}` });
+    res.json({ success: true, orders: rows });
   });
 });
+
+// 2) ACTIVE orders only (keep the original path your app calls)
+app.get('/orders/:user_id', (req, res) => {
+  const userId = parseInt(req.params.user_id, 10);
+  if (!Number.isInteger(userId)) {
+    return res.status(400).json({ success: false, message: 'Invalid user_id' });
+  }
+
+  // tweak this list if your "active" definition changes
+  const sql = `
+    SELECT 
+      o.id,
+      o.status,
+      o.quantity,
+      o.total_price,
+      m.name  AS food_name,
+      m.price,
+      m.image_url
+    FROM orders o
+    LEFT JOIN menu_items m ON o.menu_id = m.id
+    WHERE o.user_id = $1
+      AND o.status IN ('Pending','Preparing','Paid')
+    ORDER BY o.created_at DESC, o.id DESC
+  `;
+
+  db.query(sql, [userId], (err, rows) => {
+    if (err) {
+      console.error('orders (active) DB error:', err.message || err);
+      return res.json({ success: false, message: 'DB error' });
+    }
+    res.json({ success: true, orders: rows });
+  });
+});
+
 
 
 app.put('/orders/markPaid/:userId', (req, res) => {
